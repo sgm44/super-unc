@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bot Agent</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #f0f2f5;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      padding: 16px;
+    }
+
+    .chat-window {
+      background: #fff;
+      border-radius: 16px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.12);
+      width: 100%;
+      max-width: 640px;
+      height: 90vh;
+      max-height: 720px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .chat-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid #e5e7eb;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .avatar {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #6366f1, #8b5cf6);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    .chat-header-info h2 {
+      font-size: 15px;
+      font-weight: 600;
+      color: #111827;
+    }
+
+    .chat-header-info p {
+      font-size: 12px;
+      color: #6b7280;
+    }
+
+    .messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      scroll-behavior: smooth;
+    }
+
+    .message {
+      display: flex;
+      gap: 8px;
+      max-width: 80%;
+      animation: fadeIn 0.2s ease;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .message.bot { align-self: flex-start; }
+    .message.user { align-self: flex-end; flex-direction: row-reverse; }
+
+    .message-avatar {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #6366f1, #8b5cf6);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+
+    .bubble {
+      padding: 10px 14px;
+      border-radius: 16px;
+      font-size: 14px;
+      line-height: 1.5;
+      word-break: break-word;
+    }
+
+    .message.bot .bubble {
+      background: #f3f4f6;
+      color: #111827;
+      border-bottom-left-radius: 4px;
+    }
+
+    .message.user .bubble {
+      background: #6366f1;
+      color: #fff;
+      border-bottom-right-radius: 4px;
+    }
+
+    /* Typing indicator */
+    .typing-indicator {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 10px 14px;
+      background: #f3f4f6;
+      border-radius: 16px;
+      border-bottom-left-radius: 4px;
+      width: fit-content;
+    }
+
+    .typing-indicator span {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #9ca3af;
+      animation: bounce 1.2s infinite;
+    }
+
+    .typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
+    .typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
+
+    @keyframes bounce {
+      0%, 60%, 100% { transform: translateY(0); }
+      30%            { transform: translateY(-5px); }
+    }
+
+    .input-area {
+      padding: 12px 16px;
+      border-top: 1px solid #e5e7eb;
+      display: flex;
+      gap: 8px;
+      align-items: flex-end;
+    }
+
+    #user-input {
+      flex: 1;
+      border: 1px solid #d1d5db;
+      border-radius: 12px;
+      padding: 10px 14px;
+      font-size: 14px;
+      font-family: inherit;
+      resize: none;
+      outline: none;
+      max-height: 120px;
+      line-height: 1.5;
+      transition: border-color 0.15s;
+    }
+
+    #user-input:focus { border-color: #6366f1; }
+
+    #send-btn {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      border: none;
+      background: #6366f1;
+      color: #fff;
+      font-size: 18px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      transition: background 0.15s, transform 0.1s;
+    }
+
+    #send-btn:hover:not(:disabled) { background: #4f46e5; transform: scale(1.05); }
+    #send-btn:disabled { background: #c4b5fd; cursor: not-allowed; }
+
+    .api-key-banner {
+      background: #fef3c7;
+      border: 1px solid #fcd34d;
+      border-radius: 8px;
+      padding: 10px 14px;
+      margin: 12px 16px 0;
+      font-size: 13px;
+      color: #92400e;
+      display: none;
+    }
+
+    .api-key-banner a { color: #6366f1; }
+  </style>
+</head>
+<body>
+
+<div class="chat-window">
+  <div class="chat-header">
+    <div class="avatar">🤖</div>
+    <div class="chat-header-info">
+      <h2>Bot Agent</h2>
+      <p>Powered by Claude</p>
+    </div>
+  </div>
+
+  <div id="api-key-banner" class="api-key-banner">
+    ⚠️ Add your Anthropic API key to <code>index.html</code> — find <code>const API_KEY = ''</code> near the top of the script.
+    Get a key at <a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a>.
+  </div>
+
+  <div class="messages" id="messages"></div>
+
+  <div class="input-area">
+    <textarea
+      id="user-input"
+      rows="1"
+      placeholder="Type a message…"
+      autocomplete="off"
+    ></textarea>
+    <button id="send-btn" title="Send">&#8593;</button>
+  </div>
+</div>
+
+<script>
+  // ─── Configuration ────────────────────────────────────────────────────────
+  const API_KEY = '';  // <-- paste your Anthropic API key here
+  const MODEL   = 'claude-haiku-4-5-20251001';
+  const SYSTEM_PROMPT = `You are a helpful, conversational bot agent.
+When a user first tells you what they need help with, ask one focused clarifying
+question before diving into an answer. Keep responses concise and friendly.`;
+
+  // ─── State ────────────────────────────────────────────────────────────────
+  const history = [];   // { role: 'user'|'assistant', content: string }[]
+  let isWaiting = false;
+
+  // ─── DOM refs ─────────────────────────────────────────────────────────────
+  const messagesEl  = document.getElementById('messages');
+  const inputEl     = document.getElementById('user-input');
+  const sendBtn     = document.getElementById('send-btn');
+  const bannerEl    = document.getElementById('api-key-banner');
+
+  // ─── Boot ─────────────────────────────────────────────────────────────────
+  if (!API_KEY) bannerEl.style.display = 'block';
+
+  renderMessage('bot', 'Hi! 👋 What would you like help with today?');
+
+  // ─── Render helpers ───────────────────────────────────────────────────────
+  function renderMessage(role, text) {
+    const wrapper = document.createElement('div');
+    wrapper.className = `message ${role}`;
+
+    if (role === 'bot') {
+      const av = document.createElement('div');
+      av.className = 'message-avatar';
+      av.textContent = '🤖';
+      wrapper.appendChild(av);
+    }
+
+    const bubble = document.createElement('div');
+    bubble.className = 'bubble';
+    bubble.textContent = text;
+    wrapper.appendChild(bubble);
+
+    messagesEl.appendChild(wrapper);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+    return wrapper;
+  }
+
+  function showTyping() {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'message bot';
+    wrapper.id = 'typing';
+
+    const av = document.createElement('div');
+    av.className = 'message-avatar';
+    av.textContent = '🤖';
+    wrapper.appendChild(av);
+
+    const indicator = document.createElement('div');
+    indicator.className = 'typing-indicator';
+    indicator.innerHTML = '<span></span><span></span><span></span>';
+    wrapper.appendChild(indicator);
+
+    messagesEl.appendChild(wrapper);
+    messagesEl.scrollTop = messagesEl.scrollHeight;
+  }
+
+  function hideTyping() {
+    const el = document.getElementById('typing');
+    if (el) el.remove();
+  }
+
+  // ─── API call ─────────────────────────────────────────────────────────────
+  async function sendMessage(userText) {
+    if (!userText.trim() || isWaiting) return;
+
+    if (!API_KEY) {
+      renderMessage('bot', '⚠️ Please add your API key to index.html to enable responses.');
+      return;
+    }
+
+    isWaiting = true;
+    sendBtn.disabled = true;
+
+    renderMessage('user', userText);
+    history.push({ role: 'user', content: userText });
+
+    showTyping();
+
+    try {
+      const res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': API_KEY,
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-calls': 'true',
+        },
+        body: JSON.stringify({
+          model: MODEL,
+          max_tokens: 1024,
+          system: SYSTEM_PROMPT,
+          messages: history,
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err?.error?.message || `HTTP ${res.status}`);
+      }
+
+      const data = await res.json();
+      const reply = data.content?.[0]?.text ?? '(no response)';
+
+      history.push({ role: 'assistant', content: reply });
+      hideTyping();
+      renderMessage('bot', reply);
+
+    } catch (err) {
+      hideTyping();
+      renderMessage('bot', `Sorry, something went wrong: ${err.message}`);
+    } finally {
+      isWaiting = false;
+      sendBtn.disabled = false;
+      inputEl.focus();
+    }
+  }
+
+  // ─── Input handling ───────────────────────────────────────────────────────
+  sendBtn.addEventListener('click', () => {
+    sendMessage(inputEl.value);
+    inputEl.value = '';
+    inputEl.style.height = 'auto';
+  });
+
+  inputEl.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage(inputEl.value);
+      inputEl.value = '';
+      inputEl.style.height = 'auto';
+    }
+  });
+
+  // Auto-resize textarea
+  inputEl.addEventListener('input', () => {
+    inputEl.style.height = 'auto';
+    inputEl.style.height = Math.min(inputEl.scrollHeight, 120) + 'px';
+  });
+
+  // ─── TODO: future enhancements ────────────────────────────────────────────
+  // - Tool use / function calling
+  // - Persistent memory across sessions (localStorage or backend)
+  // - Multiple specialized agents with routing logic
+</script>
+
+</body>
+</html>
